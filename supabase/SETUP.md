@@ -50,22 +50,36 @@
 
 ## 5. アプリに接続情報を書く
 
-1. 左メニューの **Project Settings**（歯車）→ **API** を開く
-2. 次の2つをコピーする
-   - **Project URL**
-   - **anon public** キー
-3. `.env.local` に追記する
+1. 左メニューの **Project Settings**（歯車）→ **API Keys** を開く
+2. **Publishable key**（`sb_publishable_...` で始まるもの）をコピーする
+3. `.env.local` の `NEXT_PUBLIC_SUPABASE_ANON_KEY=` の右に貼る
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhb...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_...
 ```
 
-`anon` キーは公開されても問題ないキーです。ブラウザ側で使います。
+Project URL は **Project Settings → General** か、API Keys ページの上部に出ています。
+`https://<プロジェクトID>.supabase.co` の形です。
+
+### キーの種類について
+
+API Keys のページには4種類が並びます。使うのは1つだけです。
+
+| 種類 | 見た目 | 使うか |
+|---|---|---|
+| Publishable key | `sb_publishable_...` | **これを使う** |
+| Secret key | `sb_secret_...` | 使わない |
+| anon（Legacy） | `eyJhb...` | 旧方式。使えるが非推奨 |
+| service_role（Legacy） | `eyJhb...` | 使わない |
+
+Publishable key は公開されても問題ないキーです。ブラウザ側で使います。
 データの保護は、手順2で入れたRLS（ログインした人だけ読み書きできる規則）が担っています。
 
-もう1つ、**service_role** キーは絶対に `.env.local` 以外に書かないでください。
-このキーはRLSを無視できるため、漏れると全データが読まれます。今の構成では使いません。
+**Secret key と service_role キーは絶対にコピーしないでください。**
+これらはRLSを無視できるため、漏れると全データが読まれます。今の構成では使いません。
+
+anon（Legacy）でも動きますが、2026年末に廃止予定なので Publishable key を選んでください。
 
 ## 6. 動作確認
 

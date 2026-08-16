@@ -10,7 +10,7 @@ export async function middleware(request: NextRequest) {
   // 接続情報が無いうちはログイン画面だけ表示し、そこに案内を出す
   if (!isSupabaseConfigured()) {
     const path = request.nextUrl.pathname;
-    if (path.startsWith("/login") || path.startsWith("/preview")) {
+    if (path.startsWith("/login") || path.startsWith("/preview") || path.startsWith("/api/diag")) {
       return NextResponse.next({ request });
     }
     const url = request.nextUrl.clone();
@@ -50,7 +50,8 @@ export async function middleware(request: NextRequest) {
   const isPublic =
     requestPath.startsWith("/login") ||
     requestPath.startsWith("/auth") ||
-    requestPath.startsWith("/preview");
+    requestPath.startsWith("/preview") ||
+    requestPath.startsWith("/api/diag");
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();

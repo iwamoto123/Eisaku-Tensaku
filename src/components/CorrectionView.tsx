@@ -1,10 +1,13 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import FeedbackDoc from "@/components/FeedbackDoc";
 import { createClient } from "@/lib/supabase/client";
 import { downloadDocument, type DownloadFormat } from "@/lib/download";
 import { fileBaseFor, type CorrectionRow, type StudentRow } from "@/lib/db";
+
+/** 打ち終わってからこれだけ待って自動保存する */
+const AUTOSAVE_IDLE_MS = 5000;
 
 function nowLabel() {
   const d = new Date();
@@ -19,8 +22,17 @@ export default function CorrectionView({
   correction: CorrectionRow;
   student: StudentRow;
 }) {
-  // 講師が編集した版があればそれを表示する。無ければ生成結果から組み立てる
-  const [editedHtml, setEditedHtml] = useState<string | null>(correction.edited_html);
+  /**
+   * 資料の中身は「表示を始めた時点のHTML」で一度だけ描き、以降Reactからは触らない。
+   *
+   * 編集中にReactがHTMLを描き直すと、カーソルが先頭に戻り、
+   * ブラウザの取り消し履歴（Cmd+Z）も消えてしまう。
+   * そのため保存しても表示は差し替えず、DOMをそのまま正とする。
+   */
+  const initialHtml = useRef<string | null>(correction.edited_html);
+  const [docKey, setDocKey] = useState(0); // 意図的に描き直したいときだけ変える
+
+  const [hasEdits, setHasEdits] = useState(Boolean(correction.edited_html));
   const [editing, setEditing] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [savedAt, setSavedAt] = useState("");
@@ -41,7 +53,8 @@ export default function CorrectionView({
         .update({ edited_html: html })
         .eq("id", correction.id);
       if (error) throw error;
-      setEditedHtml(html);
+      // ここで表示用のHTMLは更新しない。更新するとカーソルが飛ぶ
+      setHasEdits(true);
       setSavedAt(nowLabel());
       setDirty(false);
       setError("");
@@ -51,10 +64,25 @@ export default function CorrectionView({
   }, [correction.id]);
 
   const handleInput = useCallback(() => {
-    setDirty(true);
+    setDirty((prev) => prev || true);
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(save, 1500);
+    saveTimer.current = setTimeout(save, AUTOSAVE_IDLE_MS);
   }, [save]);
+
+  // 保存していない変更があるまま閉じようとしたら引き止める
+  useEffect(() => {
+    if (!dirty) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [dirty]);
+
+  async function saveNow() {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    setBusy(true);
+    await save();
+    setBusy(false);
+  }
 
   async function handleDownload(format: DownloadFormat) {
     if (!docRef.current) return;
@@ -94,8 +122,18 @@ export default function CorrectionView({
     }
   }
 
-  async function revert() {
-    if (!confirm("編集内容を破棄して、生成された内容に戻します。よろしいですか。")) return;
+  /** 保存済みの内容を読み直す。書きかけの変更は捨てる */
+  function discardChanges() {
+    if (!confirm("保存していない変更を捨てて、最後に保存した状態に戻します。よろしいですか。")) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    setDirty(false);
+    window.location.reload();
+  }
+
+  /** 講師の編集をすべて取り消し、生成された内容に戻す */
+  async function revertToGenerated() {
+    if (!confirm("編集した内容をすべて捨てて、AIが作った最初の状態に戻します。よろしいですか。")) return;
+    setBusy(true);
     try {
       const supabase = createClient();
       const { error } = await supabase
@@ -103,41 +141,49 @@ export default function CorrectionView({
         .update({ edited_html: null })
         .eq("id", correction.id);
       if (error) throw error;
-      setEditedHtml(null);
+
+      initialHtml.current = null;
+      setDocKey((k) => k + 1); // ここでだけ描き直す
+      setHasEdits(false);
       setEditing(false);
       setDirty(false);
       setSavedAt("");
       setStatus("生成された内容に戻しました。");
     } catch (e) {
       setError(e instanceof Error ? e.message : "戻せませんでした。");
+    } finally {
+      setBusy(false);
     }
   }
+
+  const docProps = {
+    className: "doc-frame",
+    ref: docRef,
+    contentEditable: editing,
+    suppressContentEditableWarning: true,
+    onInput: handleInput,
+  };
 
   return (
     <main className="stage">
       <div className="toolbar">
         {editing ? (
           <>
-            <button
-              className="ghost strong"
-              onClick={() => {
-                if (saveTimer.current) clearTimeout(saveTimer.current);
-                void save();
-              }}
-              disabled={busy}
-            >
-              編集内容を保存
+            <button className="ghost strong" onClick={saveNow} disabled={busy}>
+              保存する
             </button>
             <button
               className="ghost"
               onClick={async () => {
-                if (saveTimer.current) clearTimeout(saveTimer.current);
-                await save();
+                await saveNow();
                 setEditing(false);
               }}
               disabled={busy}
             >
               保存して編集を終える
+            </button>
+            <button className="ghost" onClick={discardChanges} disabled={busy || !dirty}>
+              書きかけを捨てる
             </button>
           </>
         ) : (
@@ -161,37 +207,31 @@ export default function CorrectionView({
             ? "未保存の変更があります"
             : savedAt
               ? `${savedAt} に保存しました`
-              : editedHtml
+              : hasEdits
                 ? "編集済み"
                 : ""}
         </span>
-        {editedHtml && !editing && (
-          <button className="link-button" onClick={revert} disabled={busy}>
+        {hasEdits && !editing && (
+          <button className="link-button" onClick={revertToGenerated} disabled={busy}>
             編集を取り消す
           </button>
         )}
       </div>
 
+      {editing && (
+        <div className="status inline">
+          資料をクリックして書き換えられます。取り消しは Cmd+Z です。
+          <br />
+          打ち終わって5秒たつと自動で保存します。すぐ保存したいときは「保存する」を押してください。
+        </div>
+      )}
       {status && !error && <div className="status inline">{status}</div>}
       {error && <div className="status error inline">{error}</div>}
 
-      {editedHtml !== null ? (
-        <div
-          className="doc-frame"
-          ref={docRef}
-          contentEditable={editing}
-          suppressContentEditableWarning
-          onInput={handleInput}
-          dangerouslySetInnerHTML={{ __html: editedHtml }}
-        />
+      {initialHtml.current !== null ? (
+        <div key={docKey} {...docProps} dangerouslySetInnerHTML={{ __html: initialHtml.current }} />
       ) : (
-        <div
-          className="doc-frame"
-          ref={docRef}
-          contentEditable={editing}
-          suppressContentEditableWarning
-          onInput={handleInput}
-        >
+        <div key={docKey} {...docProps}>
           <FeedbackDoc data={correction.data!} />
         </div>
       )}

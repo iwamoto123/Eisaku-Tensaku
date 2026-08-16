@@ -37,6 +37,9 @@ export default function AppHeader({
       )}
       <span className="spacer" />
       <span className="who">{email}</span>
+      <Link href="/settings" className="link-button">
+        設定
+      </Link>
       <button className="link-button" onClick={signOut}>
         ログアウト
       </button>

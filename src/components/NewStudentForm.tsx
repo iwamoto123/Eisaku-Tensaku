@@ -54,7 +54,7 @@ export default function NewStudentForm() {
   }
 
   return (
-    <form className="inline-form" onSubmit={submit}>
+    <form className="panel-box" onSubmit={submit}>
       <h2>生徒を追加</h2>
 
       <div className="field">

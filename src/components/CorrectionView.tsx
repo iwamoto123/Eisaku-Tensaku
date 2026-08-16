@@ -6,9 +6,6 @@ import { createClient } from "@/lib/supabase/client";
 import { downloadDocument, type DownloadFormat } from "@/lib/download";
 import { fileBaseFor, type CorrectionRow, type StudentRow } from "@/lib/db";
 
-/** 打ち終わってからこれだけ待って自動保存する */
-const AUTOSAVE_IDLE_MS = 5000;
-
 function nowLabel() {
   const d = new Date();
   const p = (n: number) => String(n).padStart(2, "0");
@@ -41,10 +38,9 @@ export default function CorrectionView({
   const [error, setError] = useState("");
 
   const docRef = useRef<HTMLDivElement>(null);
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const save = useCallback(async () => {
-    if (!docRef.current) return;
+    if (!docRef.current) return false;
     const html = docRef.current.innerHTML;
     try {
       const supabase = createClient();
@@ -58,16 +54,16 @@ export default function CorrectionView({
       setSavedAt(nowLabel());
       setDirty(false);
       setError("");
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "保存に失敗しました。");
+      return false;
     }
   }, [correction.id]);
 
   const handleInput = useCallback(() => {
     setDirty((prev) => prev || true);
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(save, AUTOSAVE_IDLE_MS);
-  }, [save]);
+  }, []);
 
   // 保存していない変更があるまま閉じようとしたら引き止める
   useEffect(() => {
@@ -77,26 +73,32 @@ export default function CorrectionView({
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [dirty]);
 
-  async function saveNow() {
-    if (saveTimer.current) clearTimeout(saveTimer.current);
+  async function saveAndClose() {
     setBusy(true);
-    await save();
+    const ok = await save();
     setBusy(false);
+    if (ok) {
+      setEditing(false);
+      setStatus("保存しました。");
+    }
+  }
+
+  function cancelEditing() {
+    if (!dirty) {
+      setEditing(false);
+      return;
+    }
+    if (!confirm("保存していない変更を捨てます。よろしいですか。")) return;
+    // DOMを直接書き換えているため、読み直して確実に元へ戻す
+    setDirty(false);
+    window.location.reload();
   }
 
   async function handleDownload(format: DownloadFormat) {
     if (!docRef.current) return;
     setBusy(true);
     setError("");
-    const wasEditing = editing;
-    if (wasEditing) {
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-      await save();
-      setEditing(false);
-    }
     try {
-      // contentEditable の枠線が画像に写らないよう、解除を1フレーム待つ
-      await new Promise((r) => setTimeout(r, 60));
       const { pages, pixelRatio } = await downloadDocument(docRef.current, {
         fileBase: fileBaseFor(student, correction.target_date),
         format,
@@ -117,20 +119,11 @@ export default function CorrectionView({
     } catch (e) {
       setError(e instanceof Error ? e.message : "書き出しに失敗しました。");
     } finally {
-      setEditing(wasEditing);
       setBusy(false);
     }
   }
 
-  /** 保存済みの内容を読み直す。書きかけの変更は捨てる */
-  function discardChanges() {
-    if (!confirm("保存していない変更を捨てて、最後に保存した状態に戻します。よろしいですか。")) return;
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    setDirty(false);
-    window.location.reload();
-  }
-
-  /** 講師の編集をすべて取り消し、生成された内容に戻す */
+  /** 講師の編集をすべて捨て、AIが作った内容に戻す */
   async function revertToGenerated() {
     if (!confirm("編集した内容をすべて捨てて、AIが作った最初の状態に戻します。よろしいですか。")) return;
     setBusy(true);
@@ -148,7 +141,7 @@ export default function CorrectionView({
       setEditing(false);
       setDirty(false);
       setSavedAt("");
-      setStatus("生成された内容に戻しました。");
+      setStatus("AIが作った内容に戻しました。");
     } catch (e) {
       setError(e instanceof Error ? e.message : "戻せませんでした。");
     } finally {
@@ -169,52 +162,42 @@ export default function CorrectionView({
       <div className="toolbar">
         {editing ? (
           <>
-            <button className="ghost strong" onClick={saveNow} disabled={busy}>
-              保存する
+            <button className="ghost strong" onClick={saveAndClose} disabled={busy}>
+              保存
             </button>
-            <button
-              className="ghost"
-              onClick={async () => {
-                await saveNow();
-                setEditing(false);
-              }}
-              disabled={busy}
-            >
-              保存して編集を終える
+            <button className="ghost" onClick={cancelEditing} disabled={busy}>
+              キャンセル
             </button>
-            <button className="ghost" onClick={discardChanges} disabled={busy || !dirty}>
-              書きかけを捨てる
-            </button>
+            <span className="spacer" />
+            <span className={dirty ? "save-state unsaved" : "save-state"}>
+              {dirty ? "未保存の変更があります" : "変更なし"}
+            </span>
           </>
         ) : (
-          <button className="ghost" onClick={() => setEditing(true)} disabled={busy}>
-            本文を編集する
-          </button>
-        )}
-        <span className="divider" />
-        <button className="ghost strong" onClick={() => handleDownload("pdf")} disabled={busy}>
-          PDFで保存
-        </button>
-        <button className="ghost" onClick={() => handleDownload("png-split")} disabled={busy}>
-          PNGで保存（ページ分割）
-        </button>
-        <button className="ghost" onClick={() => handleDownload("png-single")} disabled={busy}>
-          PNGで保存（1枚）
-        </button>
-        <span className="spacer" />
-        <span className={dirty ? "save-state unsaved" : "save-state"}>
-          {dirty
-            ? "未保存の変更があります"
-            : savedAt
-              ? `${savedAt} に保存しました`
-              : hasEdits
-                ? "編集済み"
-                : ""}
-        </span>
-        {hasEdits && !editing && (
-          <button className="link-button" onClick={revertToGenerated} disabled={busy}>
-            編集を取り消す
-          </button>
+          <>
+            <button className="ghost" onClick={() => setEditing(true)} disabled={busy}>
+              本文を編集
+            </button>
+            <span className="divider" />
+            <button className="ghost strong" onClick={() => handleDownload("pdf")} disabled={busy}>
+              PDFで保存
+            </button>
+            <button className="ghost" onClick={() => handleDownload("png-split")} disabled={busy}>
+              PNGで保存（ページ分割）
+            </button>
+            <button className="ghost" onClick={() => handleDownload("png-single")} disabled={busy}>
+              PNGで保存（1枚）
+            </button>
+            <span className="spacer" />
+            <span className="save-state">
+              {savedAt ? `${savedAt} に保存しました` : hasEdits ? "編集済み" : ""}
+            </span>
+            {hasEdits && (
+              <button className="link-button" onClick={revertToGenerated} disabled={busy}>
+                AIの生成内容に戻す
+              </button>
+            )}
+          </>
         )}
       </div>
 
@@ -222,10 +205,10 @@ export default function CorrectionView({
         <div className="status inline">
           資料をクリックして書き換えられます。取り消しは Cmd+Z です。
           <br />
-          打ち終わって5秒たつと自動で保存します。すぐ保存したいときは「保存する」を押してください。
+          <strong>「保存」を押すまで保存されません。</strong>
         </div>
       )}
-      {status && !error && <div className="status inline">{status}</div>}
+      {status && !error && !editing && <div className="status inline">{status}</div>}
       {error && <div className="status error inline">{error}</div>}
 
       {initialHtml.current !== null ? (

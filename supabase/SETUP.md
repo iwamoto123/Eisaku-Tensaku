@@ -38,6 +38,17 @@
 
 これで、あらかじめ登録した講師だけがログインできます。
 
+## 3.5. ログイン後の戻り先を登録する
+
+メールのリンクを押したあと、どこへ戻すかを Supabase 側に登録しておく必要があります。
+**登録していないURLへは戻れず、ログインが失敗します。**
+
+1. 左メニューの **Authentication** → **URL Configuration** を開く
+2. **Site URL** を `http://localhost:3210` にする
+3. **Redirect URLs** に `http://localhost:3210/**` を追加する
+
+このアプリは**3210番ポート**で動きます。Supabase の初期値は3000番なので、必ず直してください。
+
 ## 4. 講師を登録する
 
 1. 左メニューの **Authentication** → **Users** を開く
@@ -104,6 +115,6 @@ Vercel のプロジェクト設定 → Environment Variables に、`.env.local` 
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase の anon キー |
 
 あわせて Supabase の **Authentication** → **URL Configuration** で、
-**Site URL** に本番のURL（`https://xxx.vercel.app`）を入れてください。
-ログインのリンクがそこへ戻るようになります。ローカルで使い続ける場合は
-**Redirect URLs** に `http://localhost:3210/**` も足しておきます。
+**Site URL** を本番のURL（`https://xxx.vercel.app`）に変更し、
+**Redirect URLs** に `https://xxx.vercel.app/**` を追加してください。
+ローカルでも使い続ける場合は `http://localhost:3210/**` を残しておきます。

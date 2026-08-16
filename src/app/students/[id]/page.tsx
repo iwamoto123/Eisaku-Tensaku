@@ -3,31 +3,27 @@ import { notFound } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import StudentSettings from "@/components/StudentSettings";
 import CorrectionList from "@/components/CorrectionList";
-import { createClient } from "@/lib/supabase/server";
-import type { CorrectionRow, StudentRow } from "@/lib/db";
+import { getViewer } from "@/lib/supabase/server";
+import { CORRECTION_LIST_COLUMNS, type CorrectionSummary, type StudentRow } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
 export default async function StudentPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await getViewer();
 
   const { data: student } = await supabase.from("students").select("*").eq("id", id).single();
   if (!student) notFound();
 
   const { data: corrections } = await supabase
     .from("corrections")
-    .select("*")
+    .select(CORRECTION_LIST_COLUMNS)
     .eq("student_id", id)
     .order("target_date", { ascending: false })
     .order("created_at", { ascending: false });
 
   const s = student as StudentRow;
-  const list = (corrections ?? []) as CorrectionRow[];
+  const list = (corrections ?? []) as CorrectionSummary[];
 
   return (
     <>

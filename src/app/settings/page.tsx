@@ -1,14 +1,11 @@
 import AppHeader from "@/components/AppHeader";
 import ProfileForm from "@/components/ProfileForm";
-import { createClient } from "@/lib/supabase/server";
+import { getViewer } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await getViewer();
 
   const { data: profile } = await supabase
     .from("instructors")

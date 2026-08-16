@@ -1274,3 +1274,38 @@ button.ghost.danger:hover:not(:disabled) {
     display: none;
   }
 }
+
+/* ============ 読み込み中の仮の枠 ============ */
+
+.sk {
+  display: block;
+  background: linear-gradient(90deg, #eef0f3 25%, #e3e6ea 37%, #eef0f3 63%);
+  background-size: 400% 100%;
+  border-radius: var(--radius-sm);
+  animation: shimmer 1.4s ease infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: 0 0; }
+}
+
+.sk-title { height: 26px; width: 220px; margin-bottom: 10px; }
+.sk-line { height: 13px; margin-bottom: 9px; }
+.sk-line.w30 { width: 30%; }
+.sk-line.w40 { width: 40%; }
+.sk-line.w60 { width: 60%; }
+.sk-line.w70 { width: 70%; }
+.sk-line.w80 { width: 80%; }
+.sk-line.w90 { width: 90%; }
+.sk-line.w95 { width: 95%; }
+.sk-btn { height: 36px; width: 120px; border-radius: var(--radius-sm); }
+.sk-cta { height: 84px; width: 100%; margin-bottom: 24px; border-radius: var(--radius); }
+.sk-card { height: 74px; width: 100%; border-radius: var(--radius); }
+.sk-input { height: 40px; width: 100%; margin-bottom: 18px; }
+.sk-block { height: 70px; width: 100%; margin-bottom: 18px; }
+.sk-block.tall { height: 110px; }
+.sk-cards { display: flex; flex-direction: column; gap: 10px; }
+.sk-hero { height: 116px; border-radius: 0; }
+.sk-doc { padding-bottom: 30px; }
+.sk-doc-body { padding: 26px 30px 0; }

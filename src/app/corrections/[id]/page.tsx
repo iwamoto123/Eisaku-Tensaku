@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import CorrectionView from "@/components/CorrectionView";
-import { createClient } from "@/lib/supabase/server";
+import { getViewer } from "@/lib/supabase/server";
 import type { CorrectionRow, StudentRow } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -13,11 +13,7 @@ export default async function CorrectionPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await getViewer();
 
   const { data: correction } = await supabase
     .from("corrections")

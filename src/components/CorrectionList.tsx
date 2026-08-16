@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ANSWERS_BUCKET } from "@/lib/constants";
-import type { CorrectionRow } from "@/lib/db";
+import type { CorrectionRow, CorrectionSummary } from "@/lib/db";
 
 const STATUS_LABEL: Record<CorrectionRow["status"], string> = {
   generating: "作成中",
@@ -13,12 +13,12 @@ const STATUS_LABEL: Record<CorrectionRow["status"], string> = {
   error: "失敗",
 };
 
-export default function CorrectionList({ corrections }: { corrections: CorrectionRow[] }) {
+export default function CorrectionList({ corrections }: { corrections: CorrectionSummary[] }) {
   const router = useRouter();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
-  async function remove(c: CorrectionRow) {
+  async function remove(c: CorrectionSummary) {
     const label = c.target_date.replaceAll("-", "/");
     if (!confirm(`${label} の添削を削除します。元に戻せません。よろしいですか。`)) return;
 
@@ -60,8 +60,8 @@ export default function CorrectionList({ corrections }: { corrections: Correctio
                 <span className="card-sub">{c.topic || "（出題内容の記録なし）"}</span>
               </span>
               <span className="card-meta">
-                {c.data ? `直すところ ${c.data.corrections.length}件` : ""}
-                {c.edited_html && <span className="dim">　編集済み</span>}
+                {c.fix_count > 0 ? `直すところ ${c.fix_count}件` : ""}
+                {c.is_edited && <span className="dim">　編集済み</span>}
               </span>
             </Link>
             <button

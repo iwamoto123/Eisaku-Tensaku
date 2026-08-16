@@ -1,7 +1,7 @@
 import Link from "next/link";
 import AppHeader from "@/components/AppHeader";
 import NewStudentForm from "@/components/NewStudentForm";
-import { createClient } from "@/lib/supabase/server";
+import { getViewer } from "@/lib/supabase/server";
 import type { StudentRow } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -13,10 +13,7 @@ function formatDate(iso: string | null): string {
 }
 
 export default async function Home() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await getViewer();
 
   const { data: students } = await supabase
     .from("students")

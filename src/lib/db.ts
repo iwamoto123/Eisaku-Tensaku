@@ -17,6 +17,8 @@ export type CorrectionRow = {
   error_message: string;
   data: Feedback | null;
   edited_html: string | null;
+  fix_count: number;
+  is_edited: boolean;
   model: string;
   input_tokens: number;
   output_tokens: number;
@@ -37,6 +39,15 @@ export type StudentRow = {
   created_at: string;
   updated_at: string;
 };
+
+/** 一覧に必要な最小限の列。添削データ本体は重いので読まない */
+export type CorrectionSummary = Pick<
+  CorrectionRow,
+  "id" | "target_date" | "topic" | "status" | "fix_count" | "is_edited" | "image_paths"
+>;
+
+export const CORRECTION_LIST_COLUMNS =
+  "id, student_id, target_date, topic, status, fix_count, is_edited, image_paths";
 
 export type StudentWithCount = StudentRow & {
   correction_count: number;

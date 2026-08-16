@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import NewCorrectionForm from "@/components/NewCorrectionForm";
-import { createClient } from "@/lib/supabase/server";
+import { getViewer } from "@/lib/supabase/server";
 import type { StudentRow } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -14,10 +14,7 @@ export default async function NewCorrectionPage({
   const { student: studentId } = await searchParams;
   if (!studentId) redirect("/");
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await getViewer();
 
   const { data: student } = await supabase
     .from("students")

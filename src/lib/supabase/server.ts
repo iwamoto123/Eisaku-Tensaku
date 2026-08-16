@@ -30,3 +30,19 @@ export async function createClient() {
     },
   );
 }
+
+/**
+ * 表示のためだけにログイン中のユーザーを取り出す。
+ *
+ * getUser() は毎回Supabaseへ問い合わせるため1回あたり90msほどかかる。
+ * ログインしているかどうかは middleware がすでに検証済みで、
+ * データの読み書きの可否はDB側のRLSが判断するため、
+ * 画面に名前を出すだけならcookieから読んで十分。
+ */
+export async function getViewer() {
+  const supabase = await createClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  return { supabase, user: session?.user ?? null };
+}

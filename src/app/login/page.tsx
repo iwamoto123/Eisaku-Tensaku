@@ -1,20 +1,39 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
+function friendlyError(message: string): string {
+  if (/not allowed|signups not allowed|user not found/i.test(message)) {
+    return "このメールアドレスは登録されていません。管理者に登録を依頼してください。";
+  }
+  if (/rate limit|only request this after/i.test(message)) {
+    return "送信の間隔が短いか、1時間あたりの送信上限に達しました。しばらく待つか、パスワードでのログインをお使いください。";
+  }
+  if (/invalid login credentials/i.test(message)) {
+    return "メールアドレスかパスワードが違います。";
+  }
+  return message;
+}
+
 function LoginForm() {
+  const router = useRouter();
   const params = useSearchParams();
   const next = params.get("next") || "/";
+  const linkError = params.get("error");
 
+  const [mode, setMode] = useState<"link" | "password">("link");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(
+    linkError === "link" ? "ログインに失敗しました。もう一度お試しください。" : (linkError ?? ""),
+  );
 
-  async function send(e: React.FormEvent) {
+  async function sendLink(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError("");
@@ -30,13 +49,27 @@ function LoginForm() {
       if (error) throw error;
       setSent(true);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      setError(
-        /not allowed|signups not allowed|user not found/i.test(message)
-          ? "このメールアドレスは登録されていません。管理者に登録を依頼してください。"
-          : message,
-      );
+      setError(friendlyError(err instanceof Error ? err.message : String(err)));
     } finally {
+      setBusy(false);
+    }
+  }
+
+  async function signInWithPassword(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      if (error) throw error;
+      router.replace(next);
+      router.refresh();
+    } catch (err) {
+      setError(friendlyError(err instanceof Error ? err.message : String(err)));
       setBusy(false);
     }
   }
@@ -52,9 +85,11 @@ function LoginForm() {
         </p>
         <p className="login-note">
           届かない場合は迷惑メールをご確認ください。リンクの有効期限は1時間です。
+          <br />
+          <strong>ログインを始めたのと同じブラウザで開いてください。</strong>
         </p>
         <button className="ghost" onClick={() => setSent(false)}>
-          別のアドレスで送り直す
+          戻る
         </button>
       </div>
     );
@@ -65,7 +100,7 @@ function LoginForm() {
       <h1>英作文添削メーカー</h1>
       <p className="login-lead">白谷塾オンライン教室</p>
 
-      <form onSubmit={send}>
+      <form onSubmit={mode === "link" ? sendLink : signInWithPassword}>
         <div className="field">
           <label>メールアドレス</label>
           <input
@@ -77,15 +112,55 @@ function LoginForm() {
             autoFocus
           />
         </div>
-        <button className="primary" type="submit" disabled={busy || !email.trim()}>
-          {busy ? "送信中…" : "ログイン用のリンクを送る"}
+
+        {mode === "password" && (
+          <div className="field">
+            <label>パスワード</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+        )}
+
+        <button
+          className="primary"
+          type="submit"
+          disabled={busy || !email.trim() || (mode === "password" && !password)}
+        >
+          {busy
+            ? mode === "link"
+              ? "送信中…"
+              : "ログイン中…"
+            : mode === "link"
+              ? "ログイン用のリンクを送る"
+              : "ログインする"}
         </button>
       </form>
 
-      <p className="login-note">
-        パスワードはありません。メールに届くリンクを押すとログインできます。
-      </p>
       {error && <div className="status error">{error}</div>}
+
+      <div className="login-note">
+        {mode === "link" ? (
+          <>
+            パスワードはありません。メールに届くリンクを押すとログインできます。
+            <br />
+            <button className="link-button" onClick={() => setMode("password")}>
+              パスワードでログインする
+            </button>
+          </>
+        ) : (
+          <>
+            管理者から受け取ったパスワードを入力してください。
+            <br />
+            <button className="link-button" onClick={() => setMode("link")}>
+              メールのリンクでログインする
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 }

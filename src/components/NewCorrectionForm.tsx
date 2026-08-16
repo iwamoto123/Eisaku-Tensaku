@@ -7,6 +7,7 @@ import { ANSWERS_BUCKET } from "@/lib/constants";
 import { toJaDate, todayISO, type StudentRow } from "@/lib/db";
 import { prepareImage, type PreparedImage } from "@/lib/image";
 import { deriveProgress, type Progress } from "@/lib/progress";
+import ProgressPanel from "@/components/ProgressPanel";
 
 const INSTRUCTOR_KEY = "writing-tensaku:instructor";
 
@@ -80,7 +81,7 @@ export default function NewCorrectionForm({
     }
     setLoading(true);
     setError("");
-    setProgress({ label: "答案の画像を保存しています", percent: 2, detail: "" });
+    setProgress({ ...deriveProgress("", 0), label: "答案の画像を保存しています", percent: 2 });
 
     const started = Date.now();
     const ticker = setInterval(() => {
@@ -160,7 +161,11 @@ export default function NewCorrectionForm({
       const errIndex = raw.indexOf("__ERROR__:");
       if (errIndex >= 0) throw new Error(raw.slice(errIndex + "__ERROR__:".length).trim());
 
-      setProgress({ label: "完成しました", percent: 100, detail: "" });
+      setProgress({
+        ...deriveProgress(raw, Math.round((Date.now() - started) / 1000)),
+        label: "完成しました",
+        percent: 100,
+      });
       router.push(`/corrections/${correctionId}`);
       router.refresh();
     } catch (e) {
@@ -296,22 +301,11 @@ export default function NewCorrectionForm({
         {loading ? "作成中…" : "添削資料をつくる"}
       </button>
 
-      {progress && (
-        <div className="progress">
-          <div className="progress-head">
-            <span className="progress-label">{progress.label}</span>
-            <span className="progress-percent">{progress.percent}%</span>
-          </div>
-          <div className="progress-track">
-            <div className="progress-bar" style={{ width: `${progress.percent}%` }} />
-          </div>
-          <div className="progress-detail">{progress.detail}</div>
-        </div>
-      )}
+      {progress && <ProgressPanel progress={progress} />}
 
       {loading && (
         <p className="login-note">
-          このまま画面を開いたままお待ちください。完成すると添削のページに移動します。
+          完成すると添削のページに移動します。3〜5分ほどかかるので、このまま開いたままお待ちください。
         </p>
       )}
 

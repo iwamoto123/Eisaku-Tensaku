@@ -1120,3 +1120,129 @@ button.ghost.danger:hover:not(:disabled) {
     overflow-x: auto;
   }
 }
+
+/* ============ 生成中の様子 ============ */
+
+.progress-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--primary);
+  flex-shrink: 0;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.8); }
+}
+
+.steps {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 14px 0 0;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.step {
+  display: flex;
+  gap: 10px;
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.step-mark {
+  width: 16px;
+  flex-shrink: 0;
+  text-align: center;
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+.step.done .step-mark { color: var(--primary); }
+.step.active .step-mark { color: var(--accent); }
+.step.todo .step-mark { color: var(--line-strong); }
+
+.step-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.step-label { color: var(--muted); }
+.step.done .step-label { color: var(--ink-soft); }
+.step.active .step-label { color: var(--ink); font-weight: 700; }
+
+.step-items {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.step-item {
+  font-size: 12px;
+  color: var(--ink-soft);
+  padding-left: 10px;
+  border-left: 2px solid var(--line);
+  animation: slide-in 0.35s ease;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@keyframes slide-in {
+  from { opacity: 0; transform: translateY(-3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ============ 一覧からの削除 ============ */
+
+.card-row {
+  position: relative;
+}
+
+.card-row .card {
+  padding-right: 48px;
+}
+
+.card-delete {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  transform: translateY(-50%);
+  width: 26px;
+  height: 26px;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--line-strong);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+
+.card-row:hover .card-delete {
+  color: var(--muted);
+}
+
+.card-delete:hover:not(:disabled) {
+  color: var(--danger);
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.card-delete:disabled {
+  cursor: not-allowed;
+}

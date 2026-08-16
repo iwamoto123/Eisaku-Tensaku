@@ -2,16 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import StudentSettings from "@/components/StudentSettings";
+import CorrectionList from "@/components/CorrectionList";
 import { createClient } from "@/lib/supabase/server";
 import type { CorrectionRow, StudentRow } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
-
-const STATUS_LABEL: Record<CorrectionRow["status"], string> = {
-  generating: "作成中",
-  done: "",
-  error: "失敗",
-};
 
 export default async function StudentPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -72,27 +67,7 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
         ) : (
           <>
             <div className="section-label">これまでの添削</div>
-            <ul className="card-list">
-              {list.map((c) => (
-                <li key={c.id}>
-                  <Link href={`/corrections/${c.id}`} className="card">
-                    <span className="card-main">
-                      <span className="card-title">
-                        {c.target_date.replaceAll("-", "/")}
-                        {c.status !== "done" && (
-                          <span className={`badge ${c.status}`}>{STATUS_LABEL[c.status]}</span>
-                        )}
-                      </span>
-                      <span className="card-sub">{c.topic || "（出題内容の記録なし）"}</span>
-                    </span>
-                    <span className="card-meta">
-                      {c.data ? `直すところ ${c.data.corrections.length}件` : ""}
-                      {c.edited_html && <span className="dim">　編集済み</span>}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            <CorrectionList corrections={list} />
           </>
         )}
       </main>

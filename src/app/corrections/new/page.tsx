@@ -38,6 +38,7 @@ export default async function NewCorrectionPage({
     <>
       <AppHeader
         email={user?.email ?? ""}
+        back={{ href: `/students/${s.id}`, label: `${s.name}${s.honorific}` }}
         breadcrumb={[
           { label: `${s.name}${s.honorific}`, href: `/students/${s.id}` },
           { label: "新しい添削" },

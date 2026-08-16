@@ -31,7 +31,8 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
 
   return (
     <>
-      <AppHeader email={user?.email ?? ""} breadcrumb={[{ label: `${s.name}${s.honorific}` }]} />
+      <AppHeader email={user?.email ?? ""} back={{ href: "/", label: "生徒一覧" }}
+        breadcrumb={[{ label: `${s.name}${s.honorific}` }]} />
       <main className="page">
         <div className="page-head">
           <h1>

@@ -43,7 +43,11 @@ export default async function CorrectionPage({
   if (c.status !== "done" || !c.data) {
     return (
       <>
-        <AppHeader email={user?.email ?? ""} breadcrumb={crumbs} />
+        <AppHeader
+          email={user?.email ?? ""}
+          back={{ href: `/students/${s.id}`, label: `${s.name}${s.honorific}` }}
+          breadcrumb={crumbs}
+        />
         <main className="page">
           <div className="empty">
             {c.status === "generating" ? (
@@ -72,7 +76,11 @@ export default async function CorrectionPage({
 
   return (
     <>
-      <AppHeader email={user?.email ?? ""} breadcrumb={crumbs} />
+      <AppHeader
+          email={user?.email ?? ""}
+          back={{ href: `/students/${s.id}`, label: `${s.name}${s.honorific}` }}
+          breadcrumb={crumbs}
+        />
       <CorrectionView correction={c} student={s} />
     </>
   );

@@ -18,7 +18,7 @@ export default async function SettingsPage() {
 
   return (
     <>
-      <AppHeader email={user?.email ?? ""} breadcrumb={[{ label: "設定" }]} />
+      <AppHeader email={user?.email ?? ""} back={{ href: "/", label: "生徒一覧" }} breadcrumb={[{ label: "設定" }]} />
       <main className="page narrow">
         <div className="page-head">
           <h1>設定</h1>

@@ -1246,3 +1246,31 @@ button.ghost.danger:hover:not(:disabled) {
 .card-delete:disabled {
   cursor: not-allowed;
 }
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--ink-soft);
+  text-decoration: none;
+  font-size: 12.5px;
+  padding: 6px 10px 6px 8px;
+  margin-left: -6px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+
+.back-link:hover {
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+}
+
+@media (max-width: 620px) {
+  .back-link .back-label {
+    display: none;
+  }
+  .app-header .crumbs {
+    display: none;
+  }
+}

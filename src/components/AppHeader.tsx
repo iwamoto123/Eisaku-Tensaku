@@ -7,9 +7,12 @@ import { createClient } from "@/lib/supabase/client";
 export default function AppHeader({
   email,
   breadcrumb,
+  back,
 }: {
   email: string;
   breadcrumb?: { label: string; href?: string }[];
+  /** 前の画面へ戻る導線。どの画面からでも1つ上に戻れるようにする */
+  back?: { href: string; label: string };
 }) {
   const router = useRouter();
 
@@ -22,6 +25,12 @@ export default function AppHeader({
 
   return (
     <header className="app-header">
+      {back && (
+        <Link href={back.href} className="back-link" title={`${back.label}へ戻る`}>
+          <span aria-hidden>←</span>
+          <span className="back-label">{back.label}</span>
+        </Link>
+      )}
       <Link href="/" className="brand">
         英作文添削メーカー
       </Link>

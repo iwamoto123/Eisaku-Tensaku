@@ -20,14 +20,23 @@ export default function CorrectionView({
   student: StudentRow;
 }) {
   /**
-   * 資料の中身は「表示を始めた時点のHTML」で一度だけ描き、以降Reactからは触らない。
+   * 編集する領域は、Reactの管理下から完全に外している。
    *
-   * 編集中にReactがHTMLを描き直すと、カーソルが先頭に戻り、
-   * ブラウザの取り消し履歴（Cmd+Z）も消えてしまう。
-   * そのため保存しても表示は差し替えず、DOMをそのまま正とする。
+   * contentEditable の中身をReactが持っていると、状態が変わって再描画されるたびに
+   * カーソルが先頭へ戻り、途中の書き換えが効かなくなる。
+   * そこで資料は「一度だけHTMLとして流し込み、あとはDOMをそのまま正とする」形にした。
+   *
+   * 生成直後（まだ編集していない）の資料は、いったん非表示の場所にReactで描いてから
+   * そのHTMLを取り出し、編集用の領域へ移している。
    */
-  const initialHtml = useRef<string | null>(correction.edited_html);
-  const [docKey, setDocKey] = useState(0); // 意図的に描き直したいときだけ変える
+  const docRef = useRef<HTMLDivElement>(null);
+  const sourceRef = useRef<HTMLDivElement>(null);
+
+  const generatedHtml = useRef<string | null>(null);
+  const currentHtml = useRef<string | null>(correction.edited_html);
+
+  const [docKey, setDocKey] = useState(0);
+  const [needsSource, setNeedsSource] = useState(correction.edited_html === null);
 
   const [hasEdits, setHasEdits] = useState(Boolean(correction.edited_html));
   const [editing, setEditing] = useState(false);
@@ -37,7 +46,19 @@ export default function CorrectionView({
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
 
-  const docRef = useRef<HTMLDivElement>(null);
+  // 資料を編集用の領域へ流し込む。docKey を変えたときだけやり直す
+  useEffect(() => {
+    const target = docRef.current;
+    if (!target) return;
+
+    if (currentHtml.current === null && sourceRef.current) {
+      // Reactが描いた資料のHTMLを取り出して覚えておく
+      generatedHtml.current = sourceRef.current.innerHTML;
+      currentHtml.current = generatedHtml.current;
+      setNeedsSource(false); // 取り出したら非表示の複製は捨てる
+    }
+    target.innerHTML = currentHtml.current ?? "";
+  }, [docKey]);
 
   const save = useCallback(async () => {
     if (!docRef.current) return false;
@@ -49,7 +70,7 @@ export default function CorrectionView({
         .update({ edited_html: html })
         .eq("id", correction.id);
       if (error) throw error;
-      // ここで表示用のHTMLは更新しない。更新するとカーソルが飛ぶ
+      currentHtml.current = html; // 表示は差し替えない。次に描き直すときのために覚えるだけ
       setHasEdits(true);
       setSavedAt(nowLabel());
       setDirty(false);
@@ -89,9 +110,9 @@ export default function CorrectionView({
       return;
     }
     if (!confirm("保存していない変更を捨てます。よろしいですか。")) return;
-    // DOMを直接書き換えているため、読み直して確実に元へ戻す
     setDirty(false);
-    window.location.reload();
+    setEditing(false);
+    setDocKey((k) => k + 1); // 保存済みの内容で描き直す
   }
 
   async function handleDownload(format: DownloadFormat) {
@@ -135,8 +156,9 @@ export default function CorrectionView({
         .eq("id", correction.id);
       if (error) throw error;
 
-      initialHtml.current = null;
-      setDocKey((k) => k + 1); // ここでだけ描き直す
+      currentHtml.current = generatedHtml.current;
+      if (currentHtml.current === null) setNeedsSource(true); // 一度も描いていない場合
+      setDocKey((k) => k + 1);
       setHasEdits(false);
       setEditing(false);
       setDirty(false);
@@ -148,14 +170,6 @@ export default function CorrectionView({
       setBusy(false);
     }
   }
-
-  const docProps = {
-    className: "doc-frame",
-    ref: docRef,
-    contentEditable: editing,
-    suppressContentEditableWarning: true,
-    onInput: handleInput,
-  };
 
   return (
     <main className="stage">
@@ -211,13 +225,22 @@ export default function CorrectionView({
       {status && !error && !editing && <div className="status inline">{status}</div>}
       {error && <div className="status error inline">{error}</div>}
 
-      {initialHtml.current !== null ? (
-        <div key={docKey} {...docProps} dangerouslySetInnerHTML={{ __html: initialHtml.current }} />
-      ) : (
-        <div key={docKey} {...docProps}>
-          <FeedbackDoc data={correction.data!} />
+      {/* 生成直後の資料をHTMLとして取り出すための場所。取り出したら消える */}
+      {needsSource && correction.data && (
+        <div ref={sourceRef} hidden aria-hidden>
+          <FeedbackDoc data={correction.data} />
         </div>
       )}
+
+      {/* 編集する領域。中身はReactが持たない */}
+      <div
+        key={docKey}
+        ref={docRef}
+        className="doc-frame"
+        contentEditable={editing}
+        suppressContentEditableWarning
+        onInput={handleInput}
+      />
     </main>
   );
 }

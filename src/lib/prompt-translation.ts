@@ -7,6 +7,10 @@ export type TranslationRequestMeta = {
   topic: string;
   englishPoints: string;
   instructorNotes: string;
+  /** テキストで提出された答案。画像の代わり、または画像に加えて届く */
+  answerText: string;
+  /** 答案画像が添付されているか */
+  hasImages: boolean;
 };
 
 /**
@@ -99,17 +103,34 @@ export const TRANSLATION_SYSTEM_PROMPT = `あなたは白谷塾オンライン�
 指示にない内容を勝手に足さないでください。`;
 
 export function buildTranslationPrompt(meta: TranslationRequestMeta): string {
-  const lines = [
-    "添付の画像は、生徒が提出した英訳課題の答案です。この課題のフィードバックを作ってください。",
-    "問題用紙と答案が別の画像になっていることがあります。その場合は対応させて読んでください。",
-    "",
+  const answer = meta.answerText.trim();
+  const lines = meta.hasImages
+    ? [
+        "添付の画像は、生徒が提出した英訳課題の答案です。この課題のフィードバックを作ってください。",
+        "問題用紙と答案が別の画像になっていることがあります。その場合は対応させて読んでください。",
+        "",
+      ]
+    : ["生徒が提出した英訳課題の答案を下に貼ります。この課題のフィードバックを作ってください。", ""];
+  lines.push(...[
     "## 生徒の情報",
     `- 氏名: ${meta.studentName || "（未入力）"}`,
     `- 敬称: ${meta.honorific}`,
     `- 級・コース: ${meta.grade}`,
     `- 日付: ${meta.dateLabel}`,
     `- 担当講師: ${meta.instructorName || "（未入力）"}`,
-  ];
+  ]);
+
+  if (answer) {
+    lines.push(
+      "",
+      "## 生徒が提出した答案（本文）",
+      meta.hasImages
+        ? "画像と同じ内容をテキストでも受け取っています。読み取りに迷ったらこちらを優先してください。"
+        : "スペルミスや打ち間違いも含めて、そのまま転記してください。日本語の問題文が一緒に書かれていれば、それを japanese に使ってください。",
+      "",
+      answer,
+    );
+  }
 
   if (meta.topic.trim()) {
     lines.push("", "## 出題内容", meta.topic.trim());

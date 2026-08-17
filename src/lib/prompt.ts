@@ -7,6 +7,10 @@ export type CorrectRequestMeta = {
   topic: string;
   englishPoints: string;
   instructorNotes: string;
+  /** テキストで提出された答案。画像の代わり、または画像に加えて届く */
+  answerText: string;
+  /** 答案画像が添付されているか */
+  hasImages: boolean;
 };
 
 /**
@@ -133,8 +137,11 @@ heading は小見出しです。不要なら空文字にします。
   料金、教材の案内は書きません。`;
 
 export function buildUserPrompt(meta: CorrectRequestMeta): string {
+  const answer = meta.answerText.trim();
   const lines = [
-    "添付の画像は生徒が提出した英作文の答案です。この答案の添削フィードバック資料を作ってください。",
+    meta.hasImages
+      ? "添付の画像は生徒が提出した英作文の答案です。この答案の添削フィードバック資料を作ってください。"
+      : "生徒が提出した英作文の答案を下に貼ります。この答案の添削フィードバック資料を作ってください。",
     "",
     "## 生徒の情報",
     `- 氏名: ${meta.studentName || "（未入力）"}`,
@@ -144,13 +151,31 @@ export function buildUserPrompt(meta: CorrectRequestMeta): string {
     `- 担当講師: ${meta.instructorName || "（未入力）"}`,
   ];
 
+  if (answer) {
+    lines.push(
+      "",
+      "## 生徒が提出した答案（本文）",
+      meta.hasImages
+        ? "画像と同じ内容をテキストでも受け取っています。読み取りに迷ったらこちらを優先してください。"
+        : "スペルミスや打ち間違いも含めて、そのまま転記してください。直して写してはいけません。",
+      "",
+      answer,
+    );
+  }
+
   if (meta.topic.trim()) {
     lines.push("", "## 出題内容", meta.topic.trim());
-  } else {
+  } else if (meta.hasImages) {
     lines.push(
       "",
       "## 出題内容",
       "画像に出題文が写っていればそれを使ってください。写っていなければ、答案の内容から出題テーマを推定して meta.topic に書いてください。",
+    );
+  } else {
+    lines.push(
+      "",
+      "## 出題内容",
+      "指定がありません。答案の内容から出題テーマを推定して meta.topic に書いてください。",
     );
   }
 

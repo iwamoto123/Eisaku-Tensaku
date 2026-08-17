@@ -28,6 +28,7 @@ export default function NewCorrectionForm({
   const [notes, setNotes] = useState("");
 
   const [images, setImages] = useState<PreparedImage[]>([]);
+  const [answerText, setAnswerText] = useState("");
   const [dragOver, setDragOver] = useState(false);
 
   const [loading, setLoading] = useState(false);
@@ -76,13 +77,17 @@ export default function NewCorrectionForm({
   }
 
   async function generate() {
-    if (images.length === 0) {
-      setError("答案の画像を追加してください。");
+    if (images.length === 0 && !answerText.trim()) {
+      setError("答案の画像を追加するか、答案の本文を貼り付けてください。");
       return;
     }
     setLoading(true);
     setError("");
-    setProgress({ ...deriveProgress("", 0, kind), label: "答案の画像を保存しています", percent: 2 });
+    setProgress({
+      ...deriveProgress("", 0, kind),
+      label: images.length > 0 ? "答案の画像を保存しています" : "答案を保存しています",
+      percent: 2,
+    });
 
     const started = Date.now();
     const ticker = setInterval(() => {
@@ -130,6 +135,7 @@ export default function NewCorrectionForm({
         english_points: englishPoints,
         instructor_notes: notes,
         image_paths: paths,
+        answer_text: answerText,
         kind,
         status: "generating",
       });
@@ -215,7 +221,8 @@ export default function NewCorrectionForm({
 
       <div className="field">
         <label>
-          画像<span className="hint">問題と答案の両方でOK・最大8枚・貼り付け可</span>
+          答案の画像
+          <span className="hint">問題と答案の両方でOK・最大8枚・貼り付け可</span>
         </label>
         <div
           className={dragOver ? "dropzone over" : "dropzone"}
@@ -265,6 +272,24 @@ export default function NewCorrectionForm({
             ))}
           </div>
         )}
+      </div>
+
+      <div className="field">
+        <label>
+          答案の本文
+          <span className="hint">
+            テキストで送ってきた場合はここに貼り付け・画像があれば書かなくてOK
+          </span>
+        </label>
+        <textarea
+          rows={8}
+          value={answerText}
+          onChange={(e) => setAnswerText(e.target.value)}
+          disabled={loading}
+          placeholder={
+            "生徒が書いた英文を、直さずにそのまま貼り付けてください。\nスペルミスもそのままで構いません。\n\n英訳課題の場合は、日本語の問題文も一緒に貼ると対応させて読み取ります。"
+          }
+        />
       </div>
 
       <div className="field-row">

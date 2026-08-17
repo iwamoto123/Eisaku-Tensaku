@@ -98,8 +98,9 @@ export async function POST(req: Request) {
       source: { type: "base64", media_type: "image/jpeg", data: base64 },
     });
   }
-  if (imageBlocks.length === 0) {
-    return Response.json({ error: "答案画像がありません。" }, { status: 400 });
+  // 画像とテキストのどちらか一方があればよい
+  if (imageBlocks.length === 0 && !row.answer_text.trim()) {
+    return Response.json({ error: "答案の画像も本文もありません。" }, { status: 400 });
   }
 
   const isTranslation = row.kind === "translation";
@@ -112,6 +113,8 @@ export async function POST(req: Request) {
     topic: row.topic,
     englishPoints: row.english_points,
     instructorNotes: row.instructor_notes,
+    answerText: row.answer_text,
+    hasImages: imageBlocks.length > 0,
   };
 
   const systemPrompt = isTranslation ? TRANSLATION_SYSTEM_PROMPT : SYSTEM_PROMPT;

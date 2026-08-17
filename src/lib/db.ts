@@ -23,6 +23,8 @@ export type CorrectionRow = {
   english_points: string;
   instructor_notes: string;
   image_paths: string[];
+  /** テキストで提出された答案。画像がない場合はこちらを読む */
+  answer_text: string;
   status: "generating" | "done" | "error";
   error_message: string;
   data: Feedback | TranslationFeedback | null;

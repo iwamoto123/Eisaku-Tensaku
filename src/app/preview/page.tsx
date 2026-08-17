@@ -39,6 +39,16 @@ export default function Preview() {
     try {
       const node = docRef.current;
       const started = Date.now();
+      // PDFと同じ高さでページを切り、各ページの埋まり具合を測る
+      const pdfPageHeight = Math.floor(node.offsetWidth * (277 / 190));
+      const pdfCuts = planPages(node, pdfPageHeight);
+      const fills = [];
+      for (let i = 0; i < pdfCuts.length - 1; i++) {
+        fills.push(Math.round(((pdfCuts[i + 1] - pdfCuts[i]) / pdfPageHeight) * 100));
+      }
+      const worst = Math.min(...fills);
+      const avg = Math.round(fills.reduce((a, b) => a + b, 0) / fills.length);
+
       const cuts = planPages(node, 1600);
       const pdf = await downloadDocument(node, {
         fileBase: "autotest",
@@ -58,10 +68,18 @@ export default function Preview() {
         },
       });
       setSlice(canvas.toDataURL("image/png"));
+      if (new URLSearchParams(window.location.search).get("pdf") === "1" && pdf.dataUri) {
+        const el = document.createElement("textarea");
+        el.id = "pdfout";
+        el.textContent = pdf.dataUri;
+        el.style.display = "none";
+        document.body.appendChild(el);
+      }
       setMessage(
         `AUTOTEST OK docH=${node.scrollHeight} pngPages=${cuts.length - 1} ` +
           `png${i + 1}=${canvas.width}x${canvas.height} ` +
           `pdfPages=${pdf.pages} pdfKB=${Math.round((pdf.bytes ?? 0) / 1024)} ` +
+          `fill平均=${avg}% 最小=${worst}% 各ページ=[${fills.join(",")}] ` +
           `ms=${Date.now() - started}`,
       );
     } catch (e) {

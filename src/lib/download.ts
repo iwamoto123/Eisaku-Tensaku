@@ -1,10 +1,25 @@
 import jsPDF from "jspdf";
-import {
-  A4_RATIO,
-  CANVAS_MAX_EDGE,
-  renderPages,
-  renderSlice,
-} from "@/lib/render-pages";
+import { CANVAS_MAX_EDGE, renderPages, renderSlice } from "@/lib/render-pages";
+
+/* ============ PDFの体裁 ============
+   ここの数値を変えると、書き出したPDFの余白とページの詰まり方が変わる。 */
+
+/** A4のサイズ（mm） */
+const A4_WIDTH_MM = 210;
+const A4_HEIGHT_MM = 297;
+
+/**
+ * 紙の端から本文までの余白（mm）。
+ * 0にすると紙いっぱいに印刷する形になるが、家庭用プリンタは端まで印刷できないため
+ * 文字が切れる。10mmあれば、たいていのプリンタでそのまま印刷できる。
+ */
+const PDF_MARGIN_MM = 10;
+
+/** ページ番号を入れるか */
+const PDF_PAGE_NUMBERS = true;
+
+const CONTENT_WIDTH_MM = A4_WIDTH_MM - PDF_MARGIN_MM * 2;
+const CONTENT_HEIGHT_MM = A4_HEIGHT_MM - PDF_MARGIN_MM * 2;
 
 export type DownloadFormat = "pdf" | "png-split" | "png-single";
 
@@ -14,6 +29,8 @@ export type DownloadResult = {
   pixelRatio: number;
   /** PDFのみ。生成されたファイルのバイト数 */
   bytes?: number;
+  /** 動作確認用。dryRunのときだけ入る */
+  dataUri?: string;
 };
 
 export type DownloadOptions = {
@@ -44,8 +61,8 @@ export async function downloadDocument(
   const pixelRatio = opts.pixelRatio ?? 2;
 
   if (opts.format === "pdf") {
-    // A4縦。資料の横幅を210mmに合わせ、ページの高さもA4比率で切る
-    const pageHeight = Math.floor(node.offsetWidth * A4_RATIO);
+    // 余白のぶんだけ本文が入る領域は狭くなる。ページを切る高さもその比率に合わせる
+    const pageHeight = Math.floor(node.offsetWidth * (CONTENT_HEIGHT_MM / CONTENT_WIDTH_MM));
     const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
     let first = true;
 
@@ -55,14 +72,36 @@ export async function downloadDocument(
       (page, index, total) => {
         if (!first) pdf.addPage();
         first = false;
-        const heightMm = (page.heightPx / page.widthPx) * 210;
-        pdf.addImage(page.dataUrl, "JPEG", 0, 0, 210, Math.min(heightMm, 297));
+        const heightMm = (page.heightPx / page.widthPx) * CONTENT_WIDTH_MM;
+        pdf.addImage(
+          page.dataUrl,
+          "JPEG",
+          PDF_MARGIN_MM,
+          PDF_MARGIN_MM,
+          CONTENT_WIDTH_MM,
+          Math.min(heightMm, CONTENT_HEIGHT_MM),
+        );
         opts.onProgress?.(index + 1, total);
       },
     );
 
+    if (PDF_PAGE_NUMBERS && pages > 1) {
+      // 日本語の書体を持たないので、番号は英数字だけで入れる
+      pdf.setFontSize(8);
+      pdf.setTextColor(150);
+      for (let i = 1; i <= pages; i++) {
+        pdf.setPage(i);
+        pdf.text(`${i} / ${pages}`, A4_WIDTH_MM / 2, A4_HEIGHT_MM - 4.5, { align: "center" });
+      }
+    }
+
     if (!opts.dryRun) pdf.save(`${opts.fileBase}.pdf`);
-    return { pages, pixelRatio, bytes: pdf.output("blob").size };
+    return {
+      pages,
+      pixelRatio,
+      bytes: pdf.output("blob").size,
+      dataUri: opts.dryRun ? pdf.output("datauristring") : undefined,
+    };
   }
 
   if (opts.format === "png-single") {

@@ -13,6 +13,9 @@ import { toCanvas } from "html-to-image";
 
 export const CANVAS_MAX_EDGE = 16000;
 
+/** ページ末尾に次の要素が写り込まないよう、手前で切る量（CSSピクセル） */
+const CUT_GUARD_PX = 4;
+
 /** A4縦の比率（297 / 210）。PDFはこの高さでページを切る。 */
 export const A4_RATIO = 297 / 210;
 
@@ -26,8 +29,11 @@ export type PageImage = {
 };
 
 /**
- * 切れ目の候補になる要素。
- * 段落・表・囲み枠の「先頭」で切るので、要素が途中で分断されることはない。
+ * 切れ目の候補になる要素。それぞれの「先頭」で切るので、要素が途中で分断されない。
+ *
+ * 箇条書きの項目（li）と表の行（tr）も候補に入れている。
+ * これらを候補にしないと、長い箇条書きが1ページに入りきらないときに
+ * その手前で改ページされ、ページの下半分が空いてしまう。
  */
 const CUT_SELECTOR = [
   "[data-sec]",
@@ -39,7 +45,24 @@ const CUT_SELECTOR = [
   ".doc > section > table",
   ".doc > section > .box",
   ".doc > section > .quote",
+  ".doc > section > ul > li",
+  ".doc > section > ol > li",
+  ".doc > section > .box > ul > li",
+  ".doc > section > .box > ol > li",
+  ".doc > section > table tbody tr",
 ].join(",");
+
+/**
+ * まとまりの途中で切ってよいかを判定する。
+ *
+ * 表と囲み（.box / .quote）は、罫線や背景がページをまたいで途切れると壊れて見える。
+ * そのため、それだけで1ページに収まらない大きなものに限って途中で切る。
+ */
+function isAllowedCut(el: HTMLElement, maxPageHeight: number): boolean {
+  const group = el.closest("table, .box, .quote");
+  if (!group) return true;
+  return group.getBoundingClientRect().height > maxPageHeight * 0.7;
+}
 
 /**
  * ページの切れ目を計算する。
@@ -53,7 +76,8 @@ export function planPages(node: HTMLElement, maxPageHeight: number): number[] {
   const nodeTop = node.getBoundingClientRect().top;
 
   const candidates = Array.from(node.querySelectorAll<HTMLElement>(CUT_SELECTOR))
-    .map((el) => ({ el, top: el.getBoundingClientRect().top - nodeTop }))
+    .filter((el) => isAllowedCut(el, maxPageHeight))
+    .map((el) => ({ el, top: Math.floor(el.getBoundingClientRect().top - nodeTop) }))
     .filter((c) => c.top > 0)
     .sort((a, b) => a.top - b.top);
 
@@ -65,7 +89,7 @@ export function planPages(node: HTMLElement, maxPageHeight: number): number[] {
       const prev: Element | null = el?.previousElementSibling ?? null;
       if (!prev || !/^H[23]$/.test(prev.tagName)) return top;
       el = prev;
-      top = prev.getBoundingClientRect().top - nodeTop;
+      top = Math.floor(prev.getBoundingClientRect().top - nodeTop);
     }
   };
 
@@ -169,7 +193,13 @@ export async function renderPages(
 
     for (let i = pageIndex; i <= lastPage; i++) {
       const cssHeight = cuts[i + 1] - cuts[i];
-      const page = crop(chunk, (cuts[i] - chunkTop) * scale, cssHeight * scale);
+      // 最終ページ以外は数画素だけ手前で切る。
+      // 画像化のときのレイアウトは実測値から2〜3px下にずれるため、ぴったり切ると
+      // 次の見出しの左罫線（5px）がページ末尾に細く写り込む。
+      // 切れ目は要素と要素のあいだ（余白が13px以上ある）に置いているので、
+      // 4px手前で切っても文字は欠けない。
+      const guard = i < pageCount - 1 ? Math.round(CUT_GUARD_PX * scale) : 0;
+      const page = crop(chunk, (cuts[i] - chunkTop) * scale, cssHeight * scale - guard);
       await onPage(
         {
           dataUrl: page.toDataURL(mimeType, quality),

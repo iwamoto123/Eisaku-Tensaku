@@ -64,8 +64,61 @@ function sectionBetween(raw: string, from: string, to: string): string {
   return raw.slice(start, end < 0 ? undefined : end);
 }
 
-export function deriveProgress(raw: string, elapsedSec: number): Progress {
+/** 英訳課題は問題数が少ないので、問ごとの進み具合を出す */
+function deriveTranslationProgress(raw: string, elapsed: string): Progress {
+  const numbers = completeStrings(sectionAfter(raw, '"items"'), "number");
+  const done = numbers.length;
+
+  const steps: Step[] = [
+    {
+      key: "tr-read",
+      label: "1問ずつ見ていく",
+      state: raw.includes('"summary"') ? "done" : "active",
+      items: numbers,
+    },
+    {
+      key: "tr-sum",
+      label: "今回の要点をまとめる",
+      state: raw.includes('"summary"') ? "active" : "todo",
+      items: [],
+    },
+  ];
+
+  if (raw.includes('"summary"')) {
+    return { label: "今回の要点をまとめています", percent: 88, detail: elapsed, steps };
+  }
+  if (done === 0) {
+    return { label: "答案を読み取っています", percent: 15, detail: elapsed, steps };
+  }
+  return {
+    label: `${done}問目まで見ました`,
+    percent: Math.min(20 + done * 20, 80),
+    detail: elapsed,
+    steps,
+  };
+}
+
+export function deriveProgress(
+  raw: string,
+  elapsedSec: number,
+  kind: "writing" | "translation" = "writing",
+): Progress {
   const elapsed = `${elapsedSec}秒経過`;
+
+  if (kind === "translation") {
+    if (raw.length === 0) {
+      return {
+        label: "答案を読み、直すところを探しています",
+        percent: 5,
+        detail: `${elapsed}／最初の出力まで1分ほどかかります`,
+        steps: [
+          { key: "tr-read", label: "1問ずつ見ていく", state: "active", items: [] },
+          { key: "tr-sum", label: "今回の要点をまとめる", state: "todo", items: [] },
+        ],
+      };
+    }
+    return deriveTranslationProgress(raw, elapsed);
+  }
 
   // どこまで書けたか
   let reachedIndex = -1;

@@ -1,6 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { FEEDBACK_SCHEMA, type Feedback } from "@/lib/schema";
 import { SYSTEM_PROMPT, buildUserPrompt } from "@/lib/prompt";
+import { TRANSLATION_SCHEMA, type TranslationFeedback } from "@/lib/schema-translation";
+import { TRANSLATION_SYSTEM_PROMPT, buildTranslationPrompt } from "@/lib/prompt-translation";
 import { recordUsage } from "@/lib/usage-log";
 import { createClient } from "@/lib/supabase/server";
 import { ANSWERS_BUCKET } from "@/lib/constants";
@@ -100,20 +102,26 @@ export async function POST(req: Request) {
     return Response.json({ error: "答案画像がありません。" }, { status: 400 });
   }
 
+  const isTranslation = row.kind === "translation";
+  const promptMeta = {
+    studentName: s.name,
+    honorific: s.honorific,
+    grade: row.grade || s.grade,
+    instructorName: row.instructor_name,
+    dateLabel: row.date_label,
+    topic: row.topic,
+    englishPoints: row.english_points,
+    instructorNotes: row.instructor_notes,
+  };
+
+  const systemPrompt = isTranslation ? TRANSLATION_SYSTEM_PROMPT : SYSTEM_PROMPT;
+  const schema = isTranslation ? TRANSLATION_SCHEMA : FEEDBACK_SCHEMA;
+
   const content: Anthropic.ContentBlockParam[] = [
     ...imageBlocks,
     {
       type: "text",
-      text: buildUserPrompt({
-        studentName: s.name,
-        honorific: s.honorific,
-        grade: row.grade || s.grade,
-        instructorName: row.instructor_name,
-        dateLabel: row.date_label,
-        topic: row.topic,
-        englishPoints: row.english_points,
-        instructorNotes: row.instructor_notes,
-      }),
+      text: isTranslation ? buildTranslationPrompt(promptMeta) : buildUserPrompt(promptMeta),
     },
   ];
 
@@ -147,9 +155,9 @@ export async function POST(req: Request) {
           thinking: { type: "adaptive" },
           output_config: {
             effort,
-            format: { type: "json_schema", schema: FEEDBACK_SCHEMA },
+            format: { type: "json_schema", schema },
           },
-          system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
+          system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
           messages: [{ role: "user", content }],
         });
 
@@ -180,15 +188,19 @@ export async function POST(req: Request) {
           return;
         }
 
-        let parsed: Feedback;
+        let parsed: Feedback | TranslationFeedback;
         try {
-          parsed = JSON.parse(raw) as Feedback;
+          parsed = JSON.parse(raw) as Feedback | TranslationFeedback;
         } catch {
           await fail("生成が途中で終わりました。通信が切れた可能性があります。もう一度お試しください。");
           return;
         }
 
-        if (parsed.corrections.length === 0 || parsed.good_points.length === 0) {
+        const incomplete = isTranslation
+          ? (parsed as TranslationFeedback).items.length === 0
+          : (parsed as Feedback).corrections.length === 0 ||
+            (parsed as Feedback).good_points.length === 0;
+        if (incomplete) {
           await fail("資料が途中までしか作られませんでした。もう一度お試しください。");
           return;
         }
@@ -204,7 +216,7 @@ export async function POST(req: Request) {
             input_tokens: finalMessage.usage.input_tokens,
             output_tokens: finalMessage.usage.output_tokens,
             elapsed_seconds: Math.round((Date.now() - startedAt) / 1000),
-            topic: row.topic || parsed.meta.topic,
+            topic: row.topic || (isTranslation ? "" : (parsed as Feedback).meta.topic),
           })
           .eq("id", correctionId);
 

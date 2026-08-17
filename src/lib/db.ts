@@ -1,10 +1,20 @@
 import type { Feedback } from "@/lib/schema";
+import type { TranslationFeedback } from "@/lib/schema-translation";
+
+/** 添削の種類。writing=ライティング答案、translation=毎日の英訳課題 */
+export type CorrectionKind = "writing" | "translation";
+
+export const KIND_LABEL: Record<CorrectionKind, string> = {
+  writing: "ライティング",
+  translation: "英訳課題",
+};
 
 /** corrections テーブルの行 */
 export type CorrectionRow = {
   id: string;
   student_id: string;
   instructor_id: string | null;
+  kind: CorrectionKind;
   instructor_name: string;
   grade: string;
   date_label: string;
@@ -15,7 +25,7 @@ export type CorrectionRow = {
   image_paths: string[];
   status: "generating" | "done" | "error";
   error_message: string;
-  data: Feedback | null;
+  data: Feedback | TranslationFeedback | null;
   edited_html: string | null;
   fix_count: number;
   is_edited: boolean;
@@ -43,11 +53,18 @@ export type StudentRow = {
 /** 一覧に必要な最小限の列。添削データ本体は重いので読まない */
 export type CorrectionSummary = Pick<
   CorrectionRow,
-  "id" | "target_date" | "topic" | "status" | "fix_count" | "is_edited" | "image_paths"
+  | "id"
+  | "target_date"
+  | "topic"
+  | "status"
+  | "kind"
+  | "fix_count"
+  | "is_edited"
+  | "image_paths"
 >;
 
 export const CORRECTION_LIST_COLUMNS =
-  "id, student_id, target_date, topic, status, fix_count, is_edited, image_paths";
+  "id, student_id, target_date, topic, status, kind, fix_count, is_edited, image_paths";
 
 export type StudentWithCount = StudentRow & {
   correction_count: number;
@@ -55,9 +72,14 @@ export type StudentWithCount = StudentRow & {
 };
 
 /** 書き出すファイル名。日本語ファイル名はリンクが開けないので英数字にする。 */
-export function fileBaseFor(student: { slug: string; name: string }, targetDate: string): string {
+export function fileBaseFor(
+  student: { slug: string; name: string },
+  targetDate: string,
+  kind: CorrectionKind = "writing",
+): string {
   const slug = student.slug.trim() || "student";
-  return `${targetDate}_${slug}_writing-feedback`;
+  const suffix = kind === "translation" ? "translation-feedback" : "writing-feedback";
+  return `${targetDate}_${slug}_${suffix}`;
 }
 
 export function toJaDate(iso: string): string {

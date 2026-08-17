@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ANSWERS_BUCKET } from "@/lib/constants";
-import type { CorrectionRow, CorrectionSummary } from "@/lib/db";
+import { KIND_LABEL, type CorrectionRow, type CorrectionSummary } from "@/lib/db";
 
 const STATUS_LABEL: Record<CorrectionRow["status"], string> = {
   generating: "作成中",
@@ -53,6 +53,7 @@ export default function CorrectionList({ corrections }: { corrections: Correctio
               <span className="card-main">
                 <span className="card-title">
                   {c.target_date.replaceAll("-", "/")}
+                  <span className={`kind-tag ${c.kind}`}>{KIND_LABEL[c.kind]}</span>
                   {c.status !== "done" && (
                     <span className={`badge ${c.status}`}>{STATUS_LABEL[c.status]}</span>
                   )}
@@ -60,7 +61,11 @@ export default function CorrectionList({ corrections }: { corrections: Correctio
                 <span className="card-sub">{c.topic || "（出題内容の記録なし）"}</span>
               </span>
               <span className="card-meta">
-                {c.fix_count > 0 ? `直すところ ${c.fix_count}件` : ""}
+                {c.fix_count > 0
+                  ? c.kind === "translation"
+                    ? `${c.fix_count}問`
+                    : `直すところ ${c.fix_count}件`
+                  : ""}
                 {c.is_edited && <span className="dim">　編集済み</span>}
               </span>
             </Link>

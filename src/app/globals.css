@@ -1309,3 +1309,122 @@ button.ghost.danger:hover:not(:disabled) {
 .sk-hero { height: 116px; border-radius: 0; }
 .sk-doc { padding-bottom: 30px; }
 .sk-doc-body { padding: 26px 30px 0; }
+
+/* ============ 種類の選択 ============ */
+
+.segmented {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.seg {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1.5px solid var(--line-strong);
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+
+.seg:hover:not(:disabled) {
+  border-color: var(--primary);
+}
+
+.seg.on {
+  border-color: var(--primary-dark);
+  background: var(--primary-soft);
+  box-shadow: 0 0 0 3px rgba(69, 139, 195, 0.12);
+}
+
+.seg:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.seg-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.seg.on .seg-title {
+  color: var(--primary-dark);
+}
+
+.seg-sub {
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+@media (max-width: 620px) {
+  .segmented {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 一覧に出す種類の印 */
+.kind-tag {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  color: var(--muted);
+  background: var(--bg);
+}
+
+.kind-tag.translation {
+  border-color: #f5d9b5;
+  color: #9a5d12;
+  background: #fdf6ec;
+}
+
+/* ============ 英訳課題のフィードバック ============ */
+
+.doc .tr-item h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.doc .verdict {
+  font-size: 11pt;
+  font-weight: 700;
+  padding: 2px 12px;
+  border: 1px solid var(--line-strong);
+  color: var(--muted);
+}
+
+.doc .verdict.ok {
+  border-color: #458bc3;
+  color: #2e6a9e;
+}
+
+.doc .verdict.minor {
+  border-color: #df8d33;
+  color: #b06a15;
+}
+
+.doc .verdict.fix {
+  border-color: #df8d33;
+  color: #b06a15;
+}
+
+.doc .tr-ja {
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.doc .tr-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--muted);
+  margin: 0 0 5px;
+}

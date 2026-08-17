@@ -2,9 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import FeedbackDoc from "@/components/FeedbackDoc";
+import TranslationDoc from "@/components/TranslationDoc";
 import { createClient } from "@/lib/supabase/client";
 import { downloadDocument, type DownloadFormat } from "@/lib/download";
 import { fileBaseFor, type CorrectionRow, type StudentRow } from "@/lib/db";
+import type { Feedback } from "@/lib/schema";
+import type { TranslationFeedback } from "@/lib/schema-translation";
 
 function nowLabel() {
   const d = new Date();
@@ -121,7 +124,7 @@ export default function CorrectionView({
     setError("");
     try {
       const { pages, pixelRatio } = await downloadDocument(docRef.current, {
-        fileBase: fileBaseFor(student, correction.target_date),
+        fileBase: fileBaseFor(student, correction.target_date, correction.kind),
         format,
         onProgress: (done, total) =>
           setStatus(total > 1 ? `書き出しています… ${done} / ${total}ページ` : "書き出しています…"),
@@ -228,7 +231,11 @@ export default function CorrectionView({
       {/* 生成直後の資料をHTMLとして取り出すための場所。取り出したら消える */}
       {needsSource && correction.data && (
         <div ref={sourceRef} hidden aria-hidden>
-          <FeedbackDoc data={correction.data} />
+          {correction.kind === "translation" ? (
+            <TranslationDoc data={correction.data as TranslationFeedback} />
+          ) : (
+            <FeedbackDoc data={correction.data as Feedback} />
+          )}
         </div>
       )}
 

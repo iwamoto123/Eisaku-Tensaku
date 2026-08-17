@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ANSWERS_BUCKET } from "@/lib/constants";
-import { toJaDate, todayISO, type StudentRow } from "@/lib/db";
+import { toJaDate, todayISO, type CorrectionKind, type StudentRow } from "@/lib/db";
 import { prepareImage, type PreparedImage } from "@/lib/image";
 import { deriveProgress, type Progress } from "@/lib/progress";
 import ProgressPanel from "@/components/ProgressPanel";
@@ -20,6 +20,7 @@ export default function NewCorrectionForm({
 }) {
   const router = useRouter();
 
+  const [kind, setKind] = useState<CorrectionKind>("writing");
   const [instructorName, setInstructorName] = useState(defaultInstructorName);
   const [date, setDate] = useState(todayISO());
   const [topic, setTopic] = useState("");
@@ -51,7 +52,7 @@ export default function NewCorrectionForm({
     setError("");
     try {
       const prepared = await Promise.all(list.map(prepareImage));
-      setImages((prev) => [...prev, ...prepared].slice(0, 6));
+      setImages((prev) => [...prev, ...prepared].slice(0, 8));
     } catch (e) {
       setError(e instanceof Error ? e.message : "画像の処理に失敗しました。");
     }
@@ -81,7 +82,7 @@ export default function NewCorrectionForm({
     }
     setLoading(true);
     setError("");
-    setProgress({ ...deriveProgress("", 0), label: "答案の画像を保存しています", percent: 2 });
+    setProgress({ ...deriveProgress("", 0, kind), label: "答案の画像を保存しています", percent: 2 });
 
     const started = Date.now();
     const ticker = setInterval(() => {
@@ -129,11 +130,12 @@ export default function NewCorrectionForm({
         english_points: englishPoints,
         instructor_notes: notes,
         image_paths: paths,
+        kind,
         status: "generating",
       });
       if (insErr) throw new Error(`記録の作成に失敗しました: ${insErr.message}`);
 
-      setProgress(deriveProgress("", 0));
+      setProgress(deriveProgress("", 0, kind));
 
       const res = await fetch("/api/correct", {
         method: "POST",
@@ -155,14 +157,14 @@ export default function NewCorrectionForm({
         const { done, value } = await reader.read();
         if (done) break;
         raw += decoder.decode(value, { stream: true });
-        setProgress(deriveProgress(raw, Math.round((Date.now() - started) / 1000)));
+        setProgress(deriveProgress(raw, Math.round((Date.now() - started) / 1000), kind));
       }
 
       const errIndex = raw.indexOf("__ERROR__:");
       if (errIndex >= 0) throw new Error(raw.slice(errIndex + "__ERROR__:".length).trim());
 
       setProgress({
-        ...deriveProgress(raw, Math.round((Date.now() - started) / 1000)),
+        ...deriveProgress(raw, Math.round((Date.now() - started) / 1000), kind),
         label: "完成しました",
         percent: 100,
       });
@@ -182,16 +184,38 @@ export default function NewCorrectionForm({
       <div className="page-head">
         <h1>
           {student.name}
-          {student.honorific}の添削をつくる
+          {student.honorific}のフィードバックをつくる
         </h1>
-        <p className="lead-text">
-          {student.grade}　答案の画像を入れて「添削資料をつくる」を押してください。
-        </p>
+        <p className="lead-text">{student.grade}</p>
+      </div>
+
+      <div className="field">
+        <label>種類</label>
+        <div className="segmented">
+          <button
+            type="button"
+            className={kind === "writing" ? "seg on" : "seg"}
+            onClick={() => setKind("writing")}
+            disabled={loading}
+          >
+            <span className="seg-title">ライティング</span>
+            <span className="seg-sub">意見論述などの答案。詳しい資料（A4で10ページ前後）</span>
+          </button>
+          <button
+            type="button"
+            className={kind === "translation" ? "seg on" : "seg"}
+            onClick={() => setKind("translation")}
+            disabled={loading}
+          >
+            <span className="seg-title">英訳課題</span>
+            <span className="seg-sub">毎日の英訳。1問ずつ短く（A4で1〜2ページ）</span>
+          </button>
+        </div>
       </div>
 
       <div className="field">
         <label>
-          答案の画像<span className="hint">複数枚可・貼り付け可</span>
+          画像<span className="hint">問題と答案の両方でOK・最大8枚・貼り付け可</span>
         </label>
         <div
           className={dragOver ? "dropzone over" : "dropzone"}
@@ -208,6 +232,8 @@ export default function NewCorrectionForm({
           }}
         >
           ここに画像をドラッグ、またはクリックして選択
+          <br />
+          問題用紙と答案を分けて入れても、まとめて読み取ります
           <br />
           スクリーンショットは Cmd+V で貼り付けられます
         </div>
@@ -298,14 +324,16 @@ export default function NewCorrectionForm({
       </div>
 
       <button className="primary" onClick={generate} disabled={loading}>
-        {loading ? "作成中…" : "添削資料をつくる"}
+        {loading ? "作成中…" : kind === "translation" ? "フィードバックをつくる" : "添削資料をつくる"}
       </button>
 
       {progress && <ProgressPanel progress={progress} />}
 
       {loading && (
         <p className="login-note">
-          完成すると添削のページに移動します。3〜5分ほどかかるので、このまま開いたままお待ちください。
+          完成すると結果のページに移動します。
+          {kind === "translation" ? "1〜2分" : "3〜5分"}
+          ほどかかるので、このまま開いたままお待ちください。
         </p>
       )}
 
